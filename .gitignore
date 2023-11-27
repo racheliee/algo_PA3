@@ -6,4 +6,5 @@
 mst
 mst.in
 mst.out
-
+.vscode
+mst.dSYM
