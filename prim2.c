@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_INSTRUCTIONS 10000
 #define INT_MAX 2147483647
+#define INPUT_FILE "mst.in"
+#define OUTPUT_FILE "mst.out"
 
 // structures ================================================================
 typedef struct EDGE{
@@ -20,7 +23,9 @@ typedef struct GRAPH{
 
 typedef struct VERTEX{
     int name;
+    int sort_key;
     int key;
+    int inMST; //checks if vertex is in MST
     struct VERTEX* parent;
 } Vertex;
 
@@ -53,30 +58,25 @@ void heapifyDown(Heap* heap, int index){
     int right = index * 2+2; //right child index
     int min = index;
 
-    if(left < heap->size && heap->vertex[left]->key < heap->vertex[index]->key){
+    if(left < heap->size && heap->vertex[left]->sort_key < heap->vertex[index]->sort_key){
         min = left;
     }
-    if(right < heap->size && heap->vertex[right]->key < heap->vertex[index]->key){
+    if(right < heap->size && heap->vertex[right]->sort_key < heap->vertex[index]->sort_key){
         min = right;
     }
 
     if(min != index){
         swap_vertex(&heap->vertex[index], &heap->vertex[min]);
-
         swap_int(&heap->pos[heap->vertex[index]->name], &heap->pos[heap->vertex[min]->name]);
-        // heap->pos[heap->vertex[min]->name] = index;
-        // heap->pos[heap->vertex[index]->name] = min;
 
         heapifyDown(heap, min);
     }
 }
 
 void heapifyUp(Heap* heap, int index){
-    while(index > 0 && heap->vertex[(index-1)/2]->key > heap->vertex[index]->key){
+    while(index > 0 && heap->vertex[(index-1)/2]->sort_key > heap->vertex[index]->sort_key){
         swap_vertex(&heap->vertex[index], &heap->vertex[(index-1)/2]);
         swap_int(&heap->pos[heap->vertex[index]->name], &heap->pos[heap->vertex[(index-1)/2]->name]);
-        // heap->pos[heap->vertex[index]->name] = (index-1)/2;
-        // heap->pos[heap->vertex[(index-1)/2]->name] = index;
 
         index = (index-1)/2;
     }
@@ -85,7 +85,7 @@ void heapifyUp(Heap* heap, int index){
 void changeKey(Heap* heap, int vertex_name, int key){
     int index = heap->pos[vertex_name];
     
-    heap->vertex[index]->key = key;
+    heap->vertex[index]->sort_key = key;
     printf("changeKey of node %d to %d\n", vertex_name, key);
 
     heapifyUp(heap, index); //reorder heap
@@ -99,13 +99,11 @@ Vertex* extractMin(Heap* heap){
     }
 
     Vertex* min = heap->vertex[0];
-    min->key = INT_MAX;
+    //min->key = min->sort_key;
+    min->sort_key = INT_MAX;
 
     swap_vertex(&heap->vertex[0], &heap->vertex[heap->size-1]);
-
     swap_int(&heap->pos[heap->vertex[0]->name], &heap->pos[heap->vertex[heap->size-1]->name]);
-    // heap->pos[heap->vertex[heap->size-1]->name] = 0;
-    // heap->pos[heap->vertex[0]->name] = heap->size-1;
 
     heap->size--;
     heapifyDown(heap, 0);
@@ -132,37 +130,79 @@ int prim(Graph* graph){
     for(int i = 0; i < graph->num_nodes; i++){
         queue.vertex[i] = malloc(sizeof(Vertex));
         queue.vertex[i]->name = i;
+        queue.vertex[i]->sort_key = INT_MAX;
         queue.vertex[i]->key = INT_MAX;
+        queue.vertex[i]->inMST = 0;
         queue.vertex[i]->parent = NULL;
         queue.pos[i] = i;
     }
 
+    int isConnected[graph->num_nodes]; //checks if nodes are connected to the MST
+    for(int i = 0; i < graph->num_nodes; i++){
+        isConnected[i] = 0;
+    }
+
+    isConnected[0] = 1;
+    queue.vertex[0]->sort_key = 0;
     queue.vertex[0]->key = 0;
     queue.vertex[0]->parent = NULL; //first element doesn't have a parent
+    queue.vertex[0]->inMST = 1;
 
     while(queue.size != 0){
         Vertex* min_node = extractMin(&queue);
         int u = min_node->name;
-        //printf("min_node: %d\n", u);
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //             printf("%d ", queue.pos[i]);
-        //         }
-        //         printf("\n");
-
-        // printf("keys: ");
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     printf("%d ", queue.vertex[i]->key);
-        // }
-        // printf("\n");
-    
+        printf("min_node: %d\n", u);
         for(int i = 0; i < graph->num_nodes; i++){
-            if(queue.pos[i] < queue.size && graph->adj_matrix[u][i] > 0 && graph->adj_matrix[u][i] < queue.vertex[i]->key){
+                    printf("%d ", queue.pos[i]);
+                }
+                printf("\n");
+
+        printf("sort keys: ");
+        for(int i = 0; i < graph->num_nodes; i++){
+            printf("%d ", queue.vertex[i]->sort_key);
+        }
+        printf("\n");
+
+        printf("keys: ");
+        for(int i = 0; i < graph->num_nodes; i++){
+            printf("%d ", queue.vertex[i]->key);
+        }
+        printf("\n");
+
+        printf("parents: ");
+        for(int i = 0; i < graph->num_nodes; i++){
+            if(queue.vertex[i]->parent != NULL){
+                printf("%d ", queue.vertex[i]->parent->name);
+            }
+            else{
+                printf("NULL ");
+            }
+        }
+        printf("\n");
+
+        printf("inMST: ");
+        for(int i = 0; i < graph->num_nodes; i++){
+            printf("%d ", queue.vertex[i]->inMST);
+        }
+        printf("\n");
+
+        for(int i = 0; i < graph->num_nodes; i++){
+
+            if(queue.vertex[queue.pos[i]]->inMST == 0 && queue.pos[i] < queue.size && graph->adj_matrix[u][i] > 0 && graph->adj_matrix[u][i] < queue.vertex[queue.pos[i]]->key){
+                //ur problem: in order to heapify down, you changed the key in the vertex to infinity
+                //but then the original key value is lost 
+                // you have to figure out to bring in down in the heap and store the key value somewhere else
+                printf("adj: %d, key: %d\n", graph->adj_matrix[u][i], queue.vertex[i]->key);
                 //printf("i: %d, size: %d\n", i, queue.size);
                 //printf("i: %d, pos[i]: %d, size: %d\n", i, queue.pos[i], queue.size);
+                // isConnected[queue.pos[i]] = 1;
+                // printf("isConnected[%d] = 1\n", queue.pos[i]);
+                queue.vertex[queue.pos[i]]->inMST = 1;
                 queue.vertex[queue.pos[i]]->parent = min_node;
-                //printf("parent of node %d is %d\n", queue.vertex[queue.pos[i]]->name, min_node->name);
+                printf("parent of node %d is %d\n", queue.vertex[queue.pos[i]]->name, min_node->name);
+                queue.vertex[queue.pos[i]]->sort_key = graph->adj_matrix[u][i];
                 queue.vertex[queue.pos[i]]->key = graph->adj_matrix[u][i];
-                //printf("changeKey of node %d to %d\n", queue.vertex[queue.pos[i]]->name, graph->adj_matrix[u][i]);
+                printf("changeKey of node %d to %d\n", queue.vertex[queue.pos[i]]->name, graph->adj_matrix[u][i]);
                 heapifyUp(&queue, queue.pos[i]);
 
                 // for(int i = 0; i < graph->num_nodes; i++){
@@ -171,10 +211,11 @@ int prim(Graph* graph){
                 // printf("\n");
             }
         }
+        printf("\n");
     }
 
     //check if all vertices have parents except for the first one
-    for(int i = 1; i < graph->num_nodes; i++){
+    for(int i = 0; i < graph->num_nodes; i++){
         if(queue.vertex[i]->parent == NULL && queue.vertex[i]->name != 0){
             return -1;
         }
@@ -184,7 +225,7 @@ int prim(Graph* graph){
 
     for(int i = 0; i < graph->num_nodes; i++){
         if(queue.vertex[i]->parent != NULL){
-            //printf("%d -> %d weight: %d\n", queue.vertex[i]->name, queue.vertex[i]->parent->name, graph->adj_matrix[queue.vertex[i]->name][queue.vertex[i]->parent->name]);
+            printf("%d -> %d weight: %d\n", queue.vertex[i]->name, queue.vertex[i]->parent->name, graph->adj_matrix[queue.vertex[i]->name][queue.vertex[i]->parent->name]);
             total_weight += graph->adj_matrix[queue.vertex[i]->name][queue.vertex[i]->parent->name];
         }
             
@@ -201,13 +242,13 @@ void insertEdge(Edge new_edge, Graph* graph){
         graph->adj_matrix[new_edge.dest-1][new_edge.src-1] = new_edge.weight;
         graph->num_edges++;
     }
-    // printf("inserted edge: %d %d %d\n", new_edge.src, new_edge.dest, new_edge.weight);
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
+    printf("inserted edge: %d %d %d\n", new_edge.src, new_edge.dest, new_edge.weight);
+    for(int i = 0; i < graph->num_nodes; i++){
+        for(int j = 0; j < graph->num_nodes; j++){
+            printf("%d ", graph->adj_matrix[i][j]);
+        }
+        printf("\n");
+    }
 }
 
 void changeWeight(Edge edge, Graph* graph){
@@ -217,13 +258,13 @@ void changeWeight(Edge edge, Graph* graph){
     }
 
     //if it doesn't exist, don't do anything
-    // printf("changed weight: %d %d %d\n", edge.src, edge.dest, edge.weight);
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
+    printf("changed weight: %d %d %d\n", edge.src, edge.dest, edge.weight);
+    for(int i = 0; i < graph->num_nodes; i++){
+        for(int j = 0; j < graph->num_nodes; j++){
+            printf("%d ", graph->adj_matrix[i][j]);
+        }
+        printf("\n");
+    }
 }
 
 void deleteEdge(Edge edge, Graph* graph){
@@ -233,25 +274,25 @@ void deleteEdge(Edge edge, Graph* graph){
         graph->num_edges--;
     }
     //if it doesn't exist, don't do anything
-    // printf("deleted edge: %d %d\n", edge.src, edge.dest);
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
+    printf("deleted edge: %d %d\n", edge.src, edge.dest);
+    for(int i = 0; i < graph->num_nodes; i++){
+        for(int j = 0; j < graph->num_nodes; j++){
+            printf("%d ", graph->adj_matrix[i][j]);
+        }
+        printf("\n");
+    }
 }
 
 void findMST(Graph* graph, FILE* output_file){
     int mst_weight = prim(graph);
-    // printf("findMST\n");
+    printf("findMST\n");
 
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
+    for(int i = 0; i < graph->num_nodes; i++){
+        for(int j = 0; j < graph->num_nodes; j++){
+            printf("%d ", graph->adj_matrix[i][j]);
+        }
+        printf("\n");
+    }
 
     //print total weight
     if(mst_weight == -1){
@@ -267,9 +308,12 @@ void findMST(Graph* graph, FILE* output_file){
 
 // main ======================================================================
 int main(){
+    //at beginning of main
+    float TIME = 0;
+    clock_t start = clock();
 
-    FILE *input_file = fopen("mst.in", "r");
-    FILE *output_file = fopen("mst.out", "w");
+    FILE *input_file = fopen(INPUT_FILE, "r");
+    FILE *output_file = fopen(OUTPUT_FILE, "w");
 
     //scan the number of nodes
     int num_nodes = 0;
@@ -318,27 +362,12 @@ int main(){
             Instr instruction;
             instruction.instruction = instr_name[0];
             fscanf(input_file, "%d %d", &instruction.edge.src, &instruction.edge.dest);
-    
-            //store smaller node to src
-            if(instruction.edge.src > instruction.edge.dest){
-                int temp = instruction.edge.src;
-                instruction.edge.src = instruction.edge.dest;
-                instruction.edge.dest = temp;
-            }
             instr_list[list_index++] = instruction;
         } //changeWeight & insertEdge instruction
         else{
             Instr instruction;
             instruction.instruction = instr_name[0];
             fscanf(input_file, "%d %d %d", &instruction.edge.src, &instruction.edge.dest, &instruction.edge.weight);
-
-            //store smaller node to src
-            if(instruction.edge.src > instruction.edge.dest){
-                int temp = instruction.edge.src;
-                instruction.edge.src = instruction.edge.dest;
-                instruction.edge.dest = temp;
-            }
-
             instr_list[list_index++] = instruction;
         }
     }
@@ -347,4 +376,8 @@ int main(){
 
     fclose(input_file);
     fclose(output_file);
+
+    //at end of main
+    TIME += ((int)clock() - start) / (CLOCKS_PER_SEC / 1000);
+    printf("TIME : %f ms\n", TIME);
 }
