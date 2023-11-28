@@ -6,7 +6,7 @@
 #define MAX_INSTRUCTIONS 10000
 #define INT_MAX 2147483647
 #define INPUT_FILE "mst.in"
-#define OUTPUT_FILE "mst.out"
+#define OUTPUT_FILE "mst.out2"
 
 // structures ================================================================
 typedef struct EDGE{
@@ -101,12 +101,6 @@ Vertex* extractMin(Heap* heap){
     Vertex* min = heap->vertex[0];
     min->sort_key = INT_MAX;
 
-    // Vertex* last = heap->vertex[heap->size-1];
-    // heap->vertex[0] = last;
-
-    // heap->pos[min->name] = heap->size-1;
-    // heap->pos[last->name] = 0;
-
     swap_vertex(&heap->vertex[0], &heap->vertex[heap->size-1]);
     swap_int(&heap->pos[heap->vertex[0]->name], &heap->pos[heap->vertex[heap->size-1]->name]);
 
@@ -150,84 +144,20 @@ int prim(Graph* graph){
     int total_weight = 0;
 
     while(queue.size != 0){
-
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //             printf("%d ", queue.pos[i]);
-        //         }
-        //         printf("\n");
-        // printf("sort keys: ");
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     printf("%d ", queue.vertex[i]->sort_key);
-        // }
-        // printf("\n");
-
-        // printf("keys: ");
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     printf("%d ", queue.vertex[i]->key);
-        // }
-        // printf("\n");
-
         Vertex* min_node = extractMin(&queue);
         int u = min_node->name;
         min_node->inMST = 1;
         total_weight += min_node->key;
-        // printf("min_node: %d\n", u);
-        // printf("min_node key: %d\n", min_node->key);
-        // printf("total_weight: %d\n", total_weight);
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //             printf("%d ", queue.pos[i]);
-        //         }
-        //         printf("\n");
-
-        // printf("sort keys: ");
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     printf("%d ", queue.vertex[i]->sort_key);
-        // }
-        // printf("\n");
-
-        // printf("keys: ");
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     printf("%d ", queue.vertex[i]->key);
-        // }
-        // printf("\n");
-
-        // printf("parents: ");
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     if(queue.vertex[i]->parent != NULL){
-        //         printf("%d ", queue.vertex[i]->parent->name);
-        //     }
-        //     else{
-        //         printf("NULL ");
-        //     }
-        // }
-        // printf("\n");
-
-        // printf("inMST: ");
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     printf("%d ", queue.vertex[i]->inMST);
-        // }
-        // printf("\n");
-
+      
         for(int i = 0; i < graph->num_nodes; i++){
 
             if(queue.vertex[queue.pos[i]]->inMST == 0 && queue.pos[i] < queue.size && graph->adj_matrix[u][i] > 0 && graph->adj_matrix[u][i] < queue.vertex[queue.pos[i]]->key){
-                // printf("adj: %d, key: %d\n", graph->adj_matrix[u][i], queue.vertex[i]->key);
-                //printf("i: %d, size: %d\n", i, queue.size);
-                //printf("i: %d, pos[i]: %d, size: %d\n", i, queue.pos[i], queue.size);
                 queue.vertex[queue.pos[i]]->parent = min_node;
-                // printf("parent of node %d is %d\n", queue.vertex[queue.pos[i]]->name, min_node->name);
                 queue.vertex[queue.pos[i]]->sort_key = graph->adj_matrix[u][i];
                 queue.vertex[queue.pos[i]]->key = graph->adj_matrix[u][i];
-                // printf("changeKey of node %d to %d\n", queue.vertex[queue.pos[i]]->name, graph->adj_matrix[u][i]);
                 heapifyUp(&queue, queue.pos[i]);
-
-                // for(int i = 0; i < graph->num_nodes; i++){
-                //     printf("%d ", queue.pos[i]);
-                // }
-                // printf("\n");
             }
-        }
-        // printf("\n");
+        } 
     }
 
     //check if all vertices have parents except for the first one
@@ -237,13 +167,6 @@ int prim(Graph* graph){
         }
     }
 
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     if(queue.vertex[i]->parent != NULL){
-    //         printf("%d -> %d weight: %d\n", queue.vertex[i]->name, queue.vertex[i]->parent->name, graph->adj_matrix[queue.vertex[i]->name][queue.vertex[i]->parent->name]);
-    //         total_weight += graph->adj_matrix[queue.vertex[i]->name][queue.vertex[i]->parent->name];
-    //     }
-    // }
-   
     return total_weight;
 }
 
@@ -254,13 +177,6 @@ void insertEdge(Edge new_edge, Graph* graph){
         graph->adj_matrix[new_edge.dest-1][new_edge.src-1] = new_edge.weight;
         graph->num_edges++;
     }
-    // printf("inserted edge: %d %d %d\n", new_edge.src, new_edge.dest, new_edge.weight);
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 void changeWeight(Edge edge, Graph* graph){
@@ -268,15 +184,6 @@ void changeWeight(Edge edge, Graph* graph){
         graph->adj_matrix[edge.src-1][edge.dest-1] = edge.weight;
         graph->adj_matrix[edge.dest-1][edge.src-1] = edge.weight;
     }
-
-    //if it doesn't exist, don't do anything
-    // printf("changed weight: %d %d %d\n", edge.src, edge.dest, edge.weight);
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 void deleteEdge(Edge edge, Graph* graph){
@@ -285,27 +192,11 @@ void deleteEdge(Edge edge, Graph* graph){
         graph->adj_matrix[edge.dest-1][edge.src-1] = 0;
         graph->num_edges--;
     }
-    //if it doesn't exist, don't do anything
-    // printf("deleted edge: %d %d\n", edge.src, edge.dest);
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
 }
 
 void findMST(Graph* graph, FILE* output_file){
     int mst_weight = prim(graph);
-    // printf("findMST\n");
-
-    // for(int i = 0; i < graph->num_nodes; i++){
-    //     for(int j = 0; j < graph->num_nodes; j++){
-    //         printf("%d ", graph->adj_matrix[i][j]);
-    //     }
-    //     printf("\n");
-    // }
-
+ 
     //print total weight
     if(mst_weight == -1){
         // printf("Disconnected\n");
@@ -393,8 +284,6 @@ int main(){
             instr_list[list_index++] = instruction;
         }
     }
-
-    // printf("num_edges: %d\n", graph.num_edges);
 
     fclose(input_file);
     fclose(output_file);

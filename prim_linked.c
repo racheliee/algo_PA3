@@ -10,14 +10,19 @@
 
 // structures ================================================================
 typedef struct EDGE{
-    int src;
     int dest;
     int weight;
+    struct EDGE* next;
 }Edge;
+
+typedef struct ADJLIST{
+    Edge* head;
+} AdjList;
 
 typedef struct GRAPH{
     int num_nodes;
     int num_edges;
+    AdjList* adj_list;
     int **adj_matrix; //linked list로 연결하는 형태로 바꾸기
 } Graph;
 
@@ -37,7 +42,9 @@ typedef struct HEAP{
 
 typedef struct INSTR{
     char instruction;
-    Edge edge;
+    int node1;
+    int node2;
+    int weight;
 }Instr;
 
 // heap functions ===========================================================
@@ -82,16 +89,6 @@ void heapifyUp(Heap* heap, int index){
     }
 }
 
-void changeKey(Heap* heap, int vertex_name, int key){
-    int index = heap->pos[vertex_name];
-    
-    heap->vertex[index]->sort_key = key;
-    printf("changeKey of node %d to %d\n", vertex_name, key);
-
-    heapifyUp(heap, index); //reorder heap
-}
-
-
 //get the minimum vertex from heap
 Vertex* extractMin(Heap* heap){
     if(heap->size == 0){
@@ -100,12 +97,6 @@ Vertex* extractMin(Heap* heap){
 
     Vertex* min = heap->vertex[0];
     min->sort_key = INT_MAX;
-
-    // Vertex* last = heap->vertex[heap->size-1];
-    // heap->vertex[0] = last;
-
-    // heap->pos[min->name] = heap->size-1;
-    // heap->pos[last->name] = 0;
 
     swap_vertex(&heap->vertex[0], &heap->vertex[heap->size-1]);
     swap_int(&heap->pos[heap->vertex[0]->name], &heap->pos[heap->vertex[heap->size-1]->name]);
@@ -155,15 +146,27 @@ int prim(Graph* graph){
         min_node->inMST = 1;
         total_weight += min_node->key;
 
-        for(int i = 0; i < graph->num_nodes; i++){
-            if(queue.vertex[queue.pos[i]]->inMST == 0 && queue.pos[i] < queue.size && graph->adj_matrix[u][i] > 0 && graph->adj_matrix[u][i] < queue.vertex[queue.pos[i]]->key){
-                queue.vertex[queue.pos[i]]->parent = min_node;
-                queue.vertex[queue.pos[i]]->sort_key = graph->adj_matrix[u][i];
-                queue.vertex[queue.pos[i]]->key = graph->adj_matrix[u][i];
-                heapifyUp(&queue, queue.pos[i]);
 
+        Edge* adjlist = graph->adj_list[u].head;
+        while(adjlist != NULL){
+            if(queue.vertex[queue.pos[adjlist->dest]]->inMST == 0 && queue.pos[adjlist->dest] < queue.size && adjlist->weight < queue.vertex[queue.pos[adjlist->dest]]->key){
+                queue.vertex[queue.pos[adjlist->dest]]->parent = min_node;
+                queue.vertex[queue.pos[adjlist->dest]]->sort_key = adjlist->weight;
+                queue.vertex[queue.pos[adjlist->dest]]->key = adjlist->weight;
+                heapifyUp(&queue, queue.pos[adjlist->dest]);
             }
+            adjlist = adjlist->next;
         }
+
+        // for(int i = 0; i < graph->num_nodes; i++){
+        //     if(queue.vertex[queue.pos[i]]->inMST == 0 && queue.pos[i] < queue.size && graph->adj_matrix[u][i] > 0 && graph->adj_matrix[u][i] < queue.vertex[queue.pos[i]]->key){
+        //         queue.vertex[queue.pos[i]]->parent = min_node;
+        //         queue.vertex[queue.pos[i]]->sort_key = graph->adj_matrix[u][i];
+        //         queue.vertex[queue.pos[i]]->key = graph->adj_matrix[u][i];
+        //         heapifyUp(&queue, queue.pos[i]);
+
+        //     }
+        // }
     }
 
     //check if all vertices have parents except for the first one
@@ -177,26 +180,96 @@ int prim(Graph* graph){
 }
 
 // input instruction functions ===========================================================
-void insertEdge(Edge new_edge, Graph* graph){
-    if(graph->adj_matrix[new_edge.src-1][new_edge.dest-1] == 0){
-        graph->adj_matrix[new_edge.src-1][new_edge.dest-1] = new_edge.weight;
-        graph->adj_matrix[new_edge.dest-1][new_edge.src-1] = new_edge.weight;
+void insertEdge(Instr instr, Graph* graph){
+    if(graph->adj_matrix[instr.node1-1][instr.node2-1] == 0){
+        graph->adj_matrix[instr.node1-1][instr.node2-1] = instr.weight;
+        graph->adj_matrix[instr.node2-1][instr.node1-1] = instr.weight;
         graph->num_edges++;
+
+        //insert into adj_list
+        Edge* new_edge = malloc(sizeof(Edge));
+        new_edge->dest = instr.node2-1;
+        new_edge->weight = instr.weight;
+        new_edge->next = graph->adj_list[instr.node1-1].head;
+        graph->adj_list[instr.node1-1].head = new_edge;
+
+        //insert into adj_list on the other side
+        Edge* new_edge2 = malloc(sizeof(Edge));
+        new_edge2->dest = instr.node1-1;
+        new_edge2->weight = instr.weight;
+        new_edge2->next = graph->adj_list[instr.node2-1].head;
+        graph->adj_list[instr.node2-1].head = new_edge2;
     }
 }
 
-void changeWeight(Edge edge, Graph* graph){
-    if(graph->adj_matrix[edge.src-1][edge.dest-1] > 0){
-        graph->adj_matrix[edge.src-1][edge.dest-1] = edge.weight;
-        graph->adj_matrix[edge.dest-1][edge.src-1] = edge.weight;
+void changeWeight(Instr instr, Graph* graph){
+    if(graph->adj_matrix[instr.node1-1][instr.node2-1] > 0){
+        graph->adj_matrix[instr.node1-1][instr.node2-1] = instr.weight;
+        graph->adj_matrix[instr.node2-1][instr.node1-1] = instr.weight;
+
+        //change weight in adj_list
+        Edge* temp = graph->adj_list[instr.node1-1].head;
+        while(temp != NULL){
+            if(temp->dest == instr.node2-1){
+                temp->weight = instr.weight;
+                break;
+            }
+            temp = temp->next;
+        }
+
+        //change weight in adj_list on the other side
+        temp = graph->adj_list[instr.node2-1].head;
+        while(temp != NULL){
+            if(temp->dest == instr.node1-1){
+                temp->weight = instr.weight;
+                break;
+            }
+            temp = temp->next;
+        }
     }
 }
 
-void deleteEdge(Edge edge, Graph* graph){
-    if(graph->adj_matrix[edge.src-1][edge.dest-1] > 0){
-        graph->adj_matrix[edge.src-1][edge.dest-1] = 0;
-        graph->adj_matrix[edge.dest-1][edge.src-1] = 0;
+void deleteEdge(Instr instr , Graph* graph){
+    if(graph->adj_matrix[instr.node1-1][instr.node2-1] > 0){
+        graph->adj_matrix[instr.node1-1][instr.node2-1] = 0;
+        graph->adj_matrix[instr.node2-1][instr.node1-1] = 0;
         graph->num_edges--;
+
+        //delete from adj_list
+        Edge* temp = graph->adj_list[instr.node1-1].head;
+        Edge* prev = NULL;
+        while(temp != NULL){
+            if(temp->dest == instr.node2-1){
+                if(prev == NULL){
+                    graph->adj_list[instr.node1-1].head = temp->next;
+                }
+                else{
+                    prev->next = temp->next;
+                }
+                free(temp);
+                break;
+            }
+            prev = temp;
+            temp = temp->next;
+        }
+
+        //delete from adj_list on the other side
+        temp = graph->adj_list[instr.node2-1].head;
+        prev = NULL;
+        while(temp != NULL){
+            if(temp->dest == instr.node1-1){
+                if(prev == NULL){
+                    graph->adj_list[instr.node2-1].head = temp->next;
+                }
+                else{
+                    prev->next = temp->next;
+                }
+                free(temp);
+                break;
+            }
+            prev = temp;
+            temp = temp->next;
+        }
     }
 }
 
@@ -235,7 +308,9 @@ int main(){
     graph.num_nodes = num_nodes;
     graph.num_edges = 0;
     graph.adj_matrix = malloc(sizeof(int*) * (num_nodes));
+    graph.adj_list = malloc(sizeof(AdjList) * num_nodes);
     for(int i = 0; i < num_nodes; i++){
+        graph.adj_list[i].head = NULL;
         graph.adj_matrix[i] = malloc(sizeof(int) * (num_nodes));
         for(int j = 0; j < num_nodes; j++){
             graph.adj_matrix[i][j] = 0;
@@ -252,15 +327,15 @@ int main(){
             for(int i = start_index; i < list_index; i++){
                 //insertEdge
                 if(instr_list[i].instruction == 'i'){
-                    insertEdge(instr_list[i].edge, &graph);
+                    insertEdge(instr_list[i], &graph);
                 }
                 //changeWeight
                 else if(instr_list[i].instruction == 'c'){
-                    changeWeight(instr_list[i].edge, &graph);
+                    changeWeight(instr_list[i], &graph);
                 }
                 //deleteEdge
                 else if(instr_list[i].instruction == 'd'){
-                    deleteEdge(instr_list[i].edge, &graph);
+                    deleteEdge(instr_list[i], &graph);
                 }
             }
             //findMST
@@ -270,13 +345,13 @@ int main(){
         else if (instr_name[0] == 'd'){
             Instr instruction;
             instruction.instruction = instr_name[0];
-            fscanf(input_file, "%d %d", &instruction.edge.src, &instruction.edge.dest);
+            fscanf(input_file, "%d %d", &instruction.node1, &instruction.node2);
             instr_list[list_index++] = instruction;
         } //changeWeight & insertEdge instruction
         else{
             Instr instruction;
             instruction.instruction = instr_name[0];
-            fscanf(input_file, "%d %d %d", &instruction.edge.src, &instruction.edge.dest, &instruction.edge.weight);
+            fscanf(input_file, "%d %d %d", &instruction.node1, &instruction.node2, &instruction.weight);
             instr_list[list_index++] = instruction;
         }
     }
