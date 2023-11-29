@@ -23,7 +23,7 @@ typedef struct GRAPH{
     int num_nodes;
     int num_edges;
     AdjList* adj_list;
-    int **adj_matrix; 
+    int **adj_matrix; //linked list로 연결하는 형태로 바꾸기
 } Graph;
 
 typedef struct VERTEX{
@@ -31,12 +31,26 @@ typedef struct VERTEX{
     int sort_key;
     int key;
     int inMST; //checks if vertex is in MST
+    int inQueue; //checks if vertex is in queue
+    struct VERTEX* edge_parent;
+    struct VERTEX* left;
+    struct VERTEX* right;
     struct VERTEX* parent;
+    struct VERTEX* child;
+    int degree;
+    int mark;
 } Vertex;
 
+typedef struct VERTEX_PTR{
+    Vertex* vertex;
+} Vertex_ptr;
+
+//create a fibonacci heap
 typedef struct HEAP{
     int size;
+    int degree;
     int* pos; //stores position of vertex in heap
+    Vertex* min; //stores the minimum vertex
     Vertex **vertex;
 }Heap;
 
@@ -60,33 +74,98 @@ void swap_vertex(Vertex** a, Vertex** b){
     *b = temp;
 }
 
-void heapifyDown(Heap* heap, int index){
-    int left = index * 2+1; // left child index
-    int right = index * 2+2; //right child index
-    int min = index;
+void link(Heap* heap, Vertex* node1, Vertex* node2){
+    node1->left->right = node1->right;
+    node1->right->left = node1->left;
 
-    if(left < heap->size && heap->vertex[left]->sort_key < heap->vertex[min]->sort_key){
-        min = left;
-    }
-    if(right < heap->size && heap->vertex[right]->sort_key < heap->vertex[min]->sort_key){
-        min = right;
+    if(node1->right == node1){
+        heap->min = node1;
     }
 
-    if(min != index){
-        swap_vertex(&heap->vertex[index], &heap->vertex[min]);
-        swap_int(&heap->pos[heap->vertex[index]->name], &heap->pos[heap->vertex[min]->name]);
+    node2->left = node2;
+    node2->right = node2;
+    node2->parent = node1;
 
-        heapifyDown(heap, min);
+    if(node1->child == NULL){
+        node1->child = node2;
     }
+    node2->right = node1->child;
+    node2->left = node1->child->left;
+    node1->child->left->right = node2;
+    node1->child->left = node2;
+    
+    if(node2->sort_key < node1->sort_key){
+        node1->child = node2;
+    }
+
+    node1->degree++;
 }
 
-void heapifyUp(Heap* heap, int index){
-    while(index > 0 && heap->vertex[(index-1)/2]->sort_key > heap->vertex[index]->sort_key){
-        swap_vertex(&heap->vertex[index], &heap->vertex[(index-1)/2]);
-        swap_int(&heap->pos[heap->vertex[index]->name], &heap->pos[heap->vertex[(index-1)/2]->name]);
-
-        index = (index-1)/2;
+int get_degree(int size){
+    int degree = 0;
+    while(size > 0){
+        size = size >> 1;
+        degree++;
     }
+    return degree;
+}
+
+
+void consolidate(Heap* heap){
+    int degree = get_degree(heap->size);
+    Vertex* arr[degree];
+    for(int i = 0; i < degree; i++){
+        arr[i] = NULL;
+    }
+    int t;
+    Vertex* v1, *v2, *v3;
+    v1 = heap->min;
+
+    do{
+        t = v1->degree;
+        while(arr[t] != NULL){
+            v2 = arr[t];
+            if(v1->sort_key > v2->sort_key){
+                swap_vertex(&v1, &v2);
+            }
+            if(v2 == heap->min){
+                heap->min = v1;
+            }
+            link(heap, v2, v1);
+            if(v1->right == v1){
+                heap->min = v1;
+            }
+            arr[t] = NULL;
+            t++;
+        }
+        arr[t] = v1;
+        v1 = v1->right;
+    }while(v1 != heap->min);
+
+    heap->min = NULL;
+    for(int i = 0; i < degree; i++){
+        if(arr[i] != NULL){
+            arr[i]->left = arr[i];
+            arr[i]->right = arr[i];
+            if(heap->min == NULL){
+                heap->min = arr[i];
+            }else{
+                heap->min->left->right = arr[i];
+                arr[i]->right = heap->min;
+                arr[i]->left = heap->min->left;
+                heap->min->left = arr[i];
+                if(arr[i]->sort_key < heap->min->sort_key){
+                    heap->min = arr[i];
+                }
+            }
+            if(heap->min == NULL){
+                heap->min = arr[i];
+            }
+            else if(arr[i]->sort_key < heap->min->sort_key){
+                heap->min = arr[i];
+            }
+        }
+    }  
 }
 
 //get the minimum vertex from heap
@@ -95,23 +174,112 @@ Vertex* extractMin(Heap* heap){
         return NULL;
     }
 
-    Vertex* min = heap->vertex[0];
-    min->sort_key = INT_MAX;
+    Vertex* min_vertex = heap->min;
+    min_vertex->sort_key = INT_MAX;
 
-    swap_vertex(&heap->vertex[0], &heap->vertex[heap->size-1]);
-    swap_int(&heap->pos[heap->vertex[0]->name], &heap->pos[heap->vertex[heap->size-1]->name]);
+    Vertex* temp = min_vertex;
+    Vertex* look = temp;
+    Vertex* child = NULL;
+
+    if(temp->child != NULL){
+        child = temp->child;
+        do{
+            look = child->right;
+            heap->min->left->right = child;
+            child->right = heap->min;
+            child->left = heap->min->left;
+            heap->min->left = child;
+            if(child->sort_key < heap->min->sort_key){
+                heap->min = child;
+            }
+            child->parent = NULL;
+            child = look;
+        }while(look != temp->child);
+    }
+
+    temp->left->right = temp->right;
+    temp->right->left = temp->left;
+    heap->min = temp->right;
+
+    if(temp == temp->right && temp->child == NULL){
+        heap->min = NULL;
+    }
+    else{
+        heap->min = temp->right;
+        //heap->pos[temp->name] = 0;
+        consolidate(heap);
+    }
 
     heap->size--;
-    heapifyDown(heap, 0);
 
-    return min;
+    return min_vertex;
 }
 
-void initHeap(int num_nodes, Heap* heap){
+void cut(Heap* heap, Vertex* node){
+    if(node->right == node){
+        node->parent->child = NULL;
+    }
+    else{
+        node->right->left = node->left;
+        node->left->right = node->right;
+        if(node->parent->child == node){
+            node->parent->child = node->right;
+        }
+    }
+    node->parent->degree--;
+    node->left = node;
+    node->right = node;
+    heap->min->left->right = node;
+    node->right = heap->min;
+    node->left = heap->min->left;
+    heap->min->left = node;
+    // node->left = heap->min;
+    // node->right = heap->min->right;
+    // heap->min->right = node;
+    // node->right->left = node;
+    node->parent = NULL;
+    node->mark = 0;
+}
+
+void cascading_cut(Heap* heap, Vertex* parent_node){
+    Vertex* temp = parent_node->parent;
+    if(temp != NULL){
+        if(parent_node->mark == 0){
+            parent_node->mark = 1;
+        }
+        else{
+            cut(heap, parent_node);
+            cascading_cut(heap, temp);
+        }
+    }
+}
+
+void initHeap(Heap* heap, int num_nodes){
     heap->size = num_nodes;
+    heap->min = NULL;
+    heap->degree = 0;
     heap->pos = malloc(sizeof(int) * num_nodes);
     heap->vertex = malloc(sizeof(Vertex*) * num_nodes);
+
+    //initialize all vertices; key values are all set to infinity
+    for(int i = 0; i < num_nodes; i++){
+        heap->vertex[i] = malloc(sizeof(Vertex));
+        heap->vertex[i]->name = i;
+        heap->vertex[i]->sort_key = INT_MAX;
+        heap->vertex[i]->key = INT_MAX;
+        heap->vertex[i]->inMST = 0;
+        heap->vertex[i]->inQueue = 1;
+        heap->vertex[i]->edge_parent = NULL;
+        heap->vertex[i]->left = NULL;
+        heap->vertex[i]->right = NULL;
+        heap->vertex[i]->parent = NULL;
+        heap->vertex[i]->child = NULL;
+        heap->vertex[i]->degree = 0;
+        heap->vertex[i]->mark = 0;
+        heap->pos[i] = i;
+    }
 }
+
 
 // functions =================================================================
 int prim(Graph* graph){
@@ -120,22 +288,16 @@ int prim(Graph* graph){
     }
 
     Heap queue;
-    initHeap(graph->num_nodes, &queue);
+    initHeap(&queue, graph->num_nodes);
 
-    //initialize all vertices; key values are all set to infinity
+    Vertex_ptr* vertex_ptrs = malloc(sizeof(Vertex_ptr) * graph->num_nodes);
     for(int i = 0; i < graph->num_nodes; i++){
-        queue.vertex[i] = malloc(sizeof(Vertex));
-        queue.vertex[i]->name = i;
-        queue.vertex[i]->sort_key = INT_MAX;
-        queue.vertex[i]->key = INT_MAX;
-        queue.vertex[i]->inMST = 0;
-        queue.vertex[i]->parent = NULL;
-        queue.pos[i] = i;
+        vertex_ptrs[i].vertex = queue.vertex[i];
     }
 
     queue.vertex[0]->sort_key = 0;
     queue.vertex[0]->key = 0;
-    queue.vertex[0]->parent = NULL; //first element doesn't have a parent
+    queue.vertex[0]->edge_parent = NULL; //first element doesn't have a parent
     queue.vertex[0]->inMST = 1;
 
     int total_weight = 0;
@@ -145,33 +307,25 @@ int prim(Graph* graph){
         int u = min_node->name;
         min_node->inMST = 1;
         total_weight += min_node->key;
-
+        min_node->inQueue = 0;
 
         Edge* adjlist = graph->adj_list[u].head;
         while(adjlist != NULL){
-            if(queue.vertex[queue.pos[adjlist->dest]]->inMST == 0 && queue.pos[adjlist->dest] < queue.size && adjlist->weight < queue.vertex[queue.pos[adjlist->dest]]->key){
-                queue.vertex[queue.pos[adjlist->dest]]->parent = min_node;
-                queue.vertex[queue.pos[adjlist->dest]]->sort_key = adjlist->weight;
-                queue.vertex[queue.pos[adjlist->dest]]->key = adjlist->weight;
-                heapifyUp(&queue, queue.pos[adjlist->dest]);
+            if(queue.vertex[vertex_ptrs->vertex->name]->inMST == 0 && queue.vertex[vertex_ptrs->vertex->name]->inQueue == 1 && adjlist->weight < vertex_ptrs[adjlist->dest].vertex->key){
+                vertex_ptrs[adjlist->dest].vertex->edge_parent = min_node;
+                vertex_ptrs[adjlist->dest].vertex->sort_key = adjlist->weight;
+                vertex_ptrs[adjlist->dest].vertex->key = adjlist->weight;    
+
+                cut(&queue, vertex_ptrs[adjlist->dest].vertex);
+                cascading_cut(&queue, vertex_ptrs[adjlist->dest].vertex->parent);
             }
             adjlist = adjlist->next;
         }
-
-        // for(int i = 0; i < graph->num_nodes; i++){
-        //     if(queue.vertex[queue.pos[i]]->inMST == 0 && queue.pos[i] < queue.size && graph->adj_matrix[u][i] > 0 && graph->adj_matrix[u][i] < queue.vertex[queue.pos[i]]->key){
-        //         queue.vertex[queue.pos[i]]->parent = min_node;
-        //         queue.vertex[queue.pos[i]]->sort_key = graph->adj_matrix[u][i];
-        //         queue.vertex[queue.pos[i]]->key = graph->adj_matrix[u][i];
-        //         heapifyUp(&queue, queue.pos[i]);
-
-        //     }
-        // }
     }
 
     //check if all vertices have parents except for the first one
     for(int i = 0; i < graph->num_nodes; i++){
-        if(queue.vertex[i]->parent == NULL && queue.vertex[i]->name != 0){
+        if(queue.vertex[i]->edge_parent == NULL && queue.vertex[i]->name != 0){
             return -1;
         }
     }
@@ -297,11 +451,6 @@ int main(){
     FILE *input_file = fopen(INPUT_FILE, "r");
     FILE *output_file = fopen(OUTPUT_FILE, "w");
 
-    if (input_file == NULL || output_file == NULL) {
-        printf("Error: File not found.\n");
-        return EXIT_FAILURE;
-    }
-
     //scan the number of nodes
     int num_nodes = 0;
     fscanf(input_file, "%d", &num_nodes);
@@ -316,7 +465,10 @@ int main(){
     graph.adj_list = malloc(sizeof(AdjList) * num_nodes);
     for(int i = 0; i < num_nodes; i++){
         graph.adj_list[i].head = NULL;
-        graph.adj_matrix[i] = calloc(num_nodes, sizeof(int));
+        graph.adj_matrix[i] = malloc(sizeof(int) * (num_nodes));
+        for(int j = 0; j < num_nodes; j++){
+            graph.adj_matrix[i][j] = 0;
+        }
     }
 
     //scan the instructions
