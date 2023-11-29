@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define MAX_INSTRUCTIONS 10000
 #define INT_MAX 2147483647
@@ -271,10 +270,6 @@ void findMST(Graph* graph, FILE* output_file){
 
 // main ======================================================================
 int main(){
-    //at beginning of main
-    float TIME = 0;
-    clock_t start = clock();
-
     FILE *input_file = fopen(INPUT_FILE, "r");
     FILE *output_file = fopen(OUTPUT_FILE, "w");
 
@@ -341,8 +336,4 @@ int main(){
 
     fclose(input_file);
     fclose(output_file);
-
-    //at end of main
-    TIME += ((int)clock() - start) / (CLOCKS_PER_SEC / 1000);
-    printf("TIME : %f ms\n", TIME);
 }
